@@ -1,0 +1,105 @@
+---
+# tasks file for ansible-role-win10-languagepack
+- name: make sure dir exist
+  win_file:
+    path: '{{ language_experience_pack_download_dir }}'
+    state: directory
+
+- name: Download Language ISOs
+  win_get_url:
+    url: '{{ item.url }}'
+    dest: '{{ item.dest }}'
+    force: no
+  loop: '{{ language_experience_pack_isos }}'
+  when: language_experience_pack_isos | length > 0
+
+- name: Mount ISOs
+  win_disk_image:
+    image_path: '{{ item.dest }}'
+    state: present
+  loop: '{{ language_experience_pack_isos }}'
+  register: disk_image_out
+  when: language_experience_pack_isos | length > 0
+
+- debug:
+    var: disk_image_out
+  when: language_experience_pack_isos | length > 0
+
+- name: Disable-ScheduledTask Pre-staged app cleanup
+  community.windows.win_scheduled_task:
+    name: 'Pre-staged app cleanup'
+    path: \Microsoft\Windows\AppxDeploymentClient
+    enabled: no
+
+- name: Add-AppProvisionedPackage
+  win_shell: |
+    Add-AppProvisionedPackage -Online -PackagePath {{ disk_image_out.results[0].mount_paths[0] }}LocalExperiencePack\{{ item }}\LanguageExperiencePack.{{ item }}.Neutral.appx -LicensePath {{ disk_image_out.results[0].mount_paths[0] }}LocalExperiencePack\{{ item }}\License.xml
+    Add-WindowsPackage -Online -PackagePath {{ disk_image_out.results[0].mount_paths[0] }}x64\langpacks\Microsoft-Windows-Client-Language-Pack_x64_{{ item }}.cab
+    Add-WindowsPackage -Online -PackagePath {{ disk_image_out.results[1].mount_paths[0] }}Microsoft-Windows-LanguageFeatures-Basic-{{ item }}-Package~31bf3856ad364e35~amd64~~.cab
+    Add-WindowsPackage -Online -PackagePath {{ disk_image_out.results[1].mount_paths[0] }}Microsoft-Windows-LanguageFeatures-Handwriting-{{ item }}-Package~31bf3856ad364e35~amd64~~.cab
+    Add-WindowsPackage -Online -PackagePath {{ disk_image_out.results[1].mount_paths[0] }}Microsoft-Windows-LanguageFeatures-OCR-{{ item }}-Package~31bf3856ad364e35~amd64~~.cab
+    Add-WindowsPackage -Online -PackagePath {{ disk_image_out.results[1].mount_paths[0] }}Microsoft-Windows-LanguageFeatures-Speech-{{ item }}-Package~31bf3856ad364e35~amd64~~.cab
+    Add-WindowsPackage -Online -PackagePath {{ disk_image_out.results[1].mount_paths[0] }}Microsoft-Windows-LanguageFeatures-TextToSpeech-{{ item }}-Package~31bf3856ad364e35~amd64~~.cab
+    Add-WindowsPackage -Online -PackagePath {{ disk_image_out.results[1].mount_paths[0] }}Microsoft-Windows-NetFx3-OnDemand-Package~31bf3856ad364e35~amd64~{{ item }}~.cab
+    Add-WindowsPackage -Online -PackagePath {{ disk_image_out.results[1].mount_paths[0] }}Microsoft-Windows-InternetExplorer-Optional-Package~31bf3856ad364e35~amd64~{{ item }}~.cab
+    Add-WindowsPackage -Online -PackagePath {{ disk_image_out.results[1].mount_paths[0] }}Microsoft-Windows-MSPaint-FoD-Package~31bf3856ad364e35~amd64~{{ item }}~.cab
+    Add-WindowsPackage -Online -PackagePath {{ disk_image_out.results[1].mount_paths[0] }}Microsoft-Windows-Notepad-FoD-Package~31bf3856ad364e35~amd64~{{ item }}~.cab
+    Add-WindowsPackage -Online -PackagePath {{ disk_image_out.results[1].mount_paths[0] }}Microsoft-Windows-PowerShell-ISE-FOD-Package~31bf3856ad364e35~amd64~{{ item }}~.cab
+    Add-WindowsPackage -Online -PackagePath {{ disk_image_out.results[1].mount_paths[0] }}Microsoft-Windows-Printing-WFS-FoD-Package~31bf3856ad364e35~amd64~{{ item }}~.cab
+    Add-WindowsPackage -Online -PackagePath {{ disk_image_out.results[1].mount_paths[0] }}Microsoft-Windows-StepsRecorder-Package~31bf3856ad364e35~amd64~{{ item }}~.cab
+    Add-WindowsPackage -Online -PackagePath {{ disk_image_out.results[1].mount_paths[0] }}Microsoft-Windows-WordPad-FoD-Package~31bf3856ad364e35~amd64~{{ item }}~.cab
+    $LanguageList = Get-WinUserLanguageList
+    $LanguageList.Add("{{ item }}")
+    Set-WinUserLanguageList $LanguageList -force
+  loop: '{{ language_experience_packs }}'
+  register: windows_language_pack_install
+  when: language_experience_packs | length > 0
+
+- debug:
+    var: windows_language_pack_install
+  when: language_experience_packs | length > 0
+
+- name: Set InboxApps Content Stores
+  win_shell: |
+    [string] $AppsContent = "{{ disk_image_out.results[2].mount_paths[0] }}"
+    ## Update installed Inbox Store Apps ##
+    foreach ($App in (Get-AppxProvisionedPackage -Online)) {
+      $AppPath = $AppsContent + $App.DisplayName + '_' + $App.PublisherId
+      Write-Host "Handling $AppPath"
+      $licFile = Get-Item $AppPath*.xml
+      if ($licFile.Count) {
+        $lic = $true
+        $licFilePath = $licFile.FullName
+      } else {
+        $lic = $false
+      }
+      $appxFile = Get-Item $AppPath*.appx*
+      if ($appxFile.Count) {
+        $appxFilePath = $appxFile.FullName
+        if ($lic) {
+          Add-AppxProvisionedPackage -Online -PackagePath $appxFilePath -LicensePath $licFilePath
+        } else {
+          Add-AppxProvisionedPackage -Online -PackagePath $appxFilePath -skiplicense
+        }
+      }
+    }
+  register: windows_language_pack_inboxapps
+  when: language_experience_pack_isos | length > 2
+
+- debug:
+    var: windows_language_pack_inboxapps
+  when: language_experience_pack_isos | length > 2
+
+- name: Umount ISOs
+  win_disk_image:
+    image_path: '{{ item.dest }}'
+    state: absent
+  loop: '{{ language_experience_pack_isos }}'
+  when: language_experience_pack_isos | length > 0
+
+- name: Remove downloaded ISOs
+  win_file:
+    path: '{{ item.dest }}'
+    state: absent
+  loop: '{{ language_experience_pack_isos }}'
+  when: language_experience_pack_isos_remove_when_finished == true

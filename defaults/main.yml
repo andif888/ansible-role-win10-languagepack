@@ -1,0 +1,15 @@
+---
+# defaults file for ansible-role-win-languagepack
+language_experience_pack_download_dir: 'C:\temp'
+language_experience_pack_isos:
+  - url: 'https://software-download.microsoft.com/download/pr/19041.1.191206-1406.vb_release_CLIENTLANGPACKDVD_OEM_MULTI.iso'
+    dest: '{{ language_experience_pack_download_dir }}\langpack.iso'
+  - url: 'https://software-download.microsoft.com/download/pr/19041.1.191206-1406.vb_release_amd64fre_FOD-PACKAGES_OEM_PT1_amd64fre_MULTI.iso'
+    dest: '{{ language_experience_pack_download_dir }}\fod.iso'
+  - url: 'https://software-download.microsoft.com/download/sg/19041.928.210407-2138.vb_release_svc_prod1_amd64fre_InboxApps.iso'
+    dest: '{{ language_experience_pack_download_dir }}\inboxapps.iso'
+
+language_experience_packs:
+  - de-de
+
+language_experience_pack_isos_remove_when_finished: true
