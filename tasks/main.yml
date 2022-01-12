@@ -1,5 +1,6 @@
 ---
 # tasks file for ansible-role-win10-languagepack
+
 - name: make sure dir exist
   win_file:
     path: '{{ language_experience_pack_download_dir }}'
@@ -30,6 +31,21 @@
     name: 'Pre-staged app cleanup'
     path: \Microsoft\Windows\AppxDeploymentClient
     enabled: no
+
+- name: Get wuauserv start_mode
+  ansible.windows.win_service:
+    name: wuauserv
+  register: wuauserv_state
+
+- debug:
+    var: wuauserv_state.start_mode
+
+- name: Set wuauserv start_mode=manual
+  ansible.windows.win_service:
+    name: wuauserv
+    start_mode: manual
+  register: wuauserv_state_modified
+  when: wuauserv_state.start_mode == 'disabled'
 
 - name: Add-AppProvisionedPackage
   win_shell: |
@@ -97,6 +113,12 @@
 - debug:
     var: windows_language_pack_inboxapps
   when: language_experience_pack_isos | length > 2
+
+- name: Restore wuauserv start_mode={{ wuauserv_state.start_mode }}
+  ansible.windows.win_service:
+    name: wuauserv
+    start_mode: '{{ wuauserv_state.start_mode }}'
+  when: wuauserv_state_modified.changed
 
 - name: Umount ISOs
   win_disk_image:
