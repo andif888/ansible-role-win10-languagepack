@@ -15,9 +15,8 @@
   when: language_experience_pack_isos | length > 0
 
 - name: Sleep for 10 seconds and continue with play
-  wait_for:
-    timeout: 10
-  delegate_to: localhost
+  pause:
+    seconds: 10
 
 - name: Mount ISOs
   win_disk_image:
