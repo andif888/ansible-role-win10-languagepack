@@ -1,5 +1,9 @@
 ---
 # tasks file for ansible-role-win10-languagepack
+- name: disable antimalware realtime shit
+  win_shell: |
+    Set-MpPreference -DisableRealtimeMonitoring $true
+  ignore_errors: yes
 
 - name: make sure dir exist
   win_file:
@@ -137,3 +141,8 @@
     state: absent
   loop: '{{ language_experience_pack_isos }}'
   when: language_experience_pack_isos_remove_when_finished == true
+
+- name: re-enable antimalware realtime shit
+  win_shell: |
+    Set-MpPreference -DisableRealtimeMonitoring $false
+  ignore_errors: yes
