@@ -13,3 +13,4 @@ language_experience_packs:
   - de-de
 
 language_experience_pack_isos_remove_when_finished: true
+language_experience_win_path_seperator: '\'

@@ -93,7 +93,7 @@
 
 - name: Set InboxApps Content Stores
   win_shell: |
-    [string] $AppsContent = "{{ disk_image_out.results[2].mount_paths[0] }}"
+    [string] $AppsContent = "{{ disk_image_out.results[2].mount_paths[0] }}amd64fre{{ language_experience_win_path_seperator }}"
     ## Update installed Inbox Store Apps ##
     foreach ($App in (Get-AppxProvisionedPackage -Online)) {
       $AppPath = $AppsContent + $App.DisplayName + '_' + $App.PublisherId
