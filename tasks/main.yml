@@ -1,14 +1,33 @@
 ---
 # tasks file for ansible-role-win10-languagepack
+- name: Lookup current languages
+  ansible.windows.win_reg_stat:
+    path: HKLM:\SYSTEM\CurrentControlSet\Control\MUI\UILanguages\
+  register: current_languages
+
+- name: Languages currently installed on system
+  debug:
+      var: current_languages.sub_keys
+
+- name: Create list of languages needed be to install
+  set_fact:
+    to_install_languages: "{{ language_experience_packs | difference(current_languages.sub_keys) }}"
+
+- name: Missing languages going to be installed
+  debug:
+      var: to_install_languages
+
 - name: disable antimalware realtime shit
   win_shell: |
     Set-MpPreference -DisableRealtimeMonitoring $true
   ignore_errors: yes
+  when: to_install_languages | length > 0
 
 - name: make sure dir exist
   win_file:
     path: '{{ language_experience_pack_download_dir }}'
     state: directory
+  when: to_install_languages | length > 0
 
 - name: Download Language ISOs
   win_get_url:
@@ -16,11 +35,14 @@
     dest: '{{ item.dest }}'
     force: no
   loop: '{{ language_experience_pack_isos }}'
-  when: language_experience_pack_isos | length > 0
+  when:
+    - to_install_languages | length > 0 
+    - language_experience_pack_isos | length > 0
 
 - name: Sleep for 10 seconds and continue with play
   pause:
     seconds: 10
+  when: to_install_languages | length > 0
 
 - name: Mount ISOs
   win_disk_image:
@@ -28,32 +50,41 @@
     state: present
   loop: '{{ language_experience_pack_isos }}'
   register: disk_image_out
-  when: language_experience_pack_isos | length > 0
+  when: 
+    - to_install_languages | length > 0
+    - language_experience_pack_isos | length > 0
 
 - debug:
     var: disk_image_out
-  when: language_experience_pack_isos | length > 0
+  when:
+    - to_install_languages | length > 0 
+    - language_experience_pack_isos | length > 0
 
 - name: Disable-ScheduledTask Pre-staged app cleanup
   community.windows.win_scheduled_task:
     name: 'Pre-staged app cleanup'
     path: \Microsoft\Windows\AppxDeploymentClient
     enabled: no
+  when: to_install_languages | length > 0
 
 - name: Get wuauserv start_mode
   ansible.windows.win_service:
     name: wuauserv
   register: wuauserv_state
+  when: to_install_languages | length > 0
 
 - debug:
     var: wuauserv_state.start_mode
+  when: to_install_languages | length > 0
 
 - name: Set wuauserv start_mode=manual
   ansible.windows.win_service:
     name: wuauserv
     start_mode: manual
   register: wuauserv_state_modified
-  when: wuauserv_state.start_mode == 'disabled'
+  when:
+    - to_install_languages | length > 0 
+    - wuauserv_state.start_mode == 'disabled'
 
 - name: Add-AppProvisionedPackage
   win_shell: |
@@ -83,13 +114,17 @@
     $LanguageList = Get-WinUserLanguageList
     $LanguageList.Add("{{ item }}")
     Set-WinUserLanguageList $LanguageList -force
-  loop: '{{ language_experience_packs }}'
+  loop: '{{ to_install_languages }}'
   register: windows_language_pack_install
-  when: language_experience_packs | length > 0
+  when:
+    - to_install_languages | length > 0 
+    - language_experience_packs | length > 0
 
 - debug:
     var: windows_language_pack_install
-  when: language_experience_packs | length > 0
+  when:
+    - to_install_languages | length > 0 
+    - language_experience_packs | length > 0
 
 - name: Set InboxApps Content Stores
   win_shell: |
@@ -116,33 +151,44 @@
       }
     }
   register: windows_language_pack_inboxapps
-  when: language_experience_pack_isos | length > 2
+  when:
+    - to_install_languages | length > 0 
+    - language_experience_pack_isos | length > 2
 
 - debug:
     var: windows_language_pack_inboxapps
-  when: language_experience_pack_isos | length > 2
+  when:
+    - to_install_languages | length > 0 
+    - language_experience_pack_isos | length > 2
 
 - name: Restore wuauserv start_mode={{ wuauserv_state.start_mode }}
   ansible.windows.win_service:
     name: wuauserv
     start_mode: '{{ wuauserv_state.start_mode }}'
-  when: wuauserv_state_modified.changed
+  when:
+    - to_install_languages | length > 0 
+    - wuauserv_state_modified.changed
 
 - name: Umount ISOs
   win_disk_image:
     image_path: '{{ item.dest }}'
     state: absent
   loop: '{{ language_experience_pack_isos }}'
-  when: language_experience_pack_isos | length > 0
+  when:
+    - to_install_languages | length > 0 
+    - language_experience_pack_isos | length > 0
 
 - name: Remove downloaded ISOs
   win_file:
     path: '{{ item.dest }}'
     state: absent
   loop: '{{ language_experience_pack_isos }}'
-  when: language_experience_pack_isos_remove_when_finished == true
+  when:
+    - to_install_languages | length > 0 
+    - language_experience_pack_isos_remove_when_finished == true
 
 - name: re-enable antimalware realtime shit
   win_shell: |
     Set-MpPreference -DisableRealtimeMonitoring $false
   ignore_errors: yes
+  when: to_install_languages | length > 0

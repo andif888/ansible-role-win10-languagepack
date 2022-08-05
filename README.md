@@ -20,7 +20,7 @@ language_experience_pack_isos:
     dest: '{{ language_experience_pack_download_dir }}\inboxapps.iso'
 
 language_experience_packs:
-  - de-de
+  - de-DE    # note: case sensitive!!!
 
 language_experience_pack_isos_remove_when_finished: true
 ```
@@ -35,8 +35,8 @@ Including an example of how to use your role (for instance, with variables passe
   vars:
     language_experience_pack_download_dir: 'D:\temp'
     language_experience_packs:
-      - de-de
-      - nl-nl
+      - de-DE    # note: case sensitive!!!
+      - nl-NL    # note: case sensitive!!!
 
   roles:
     - { role: ansible-role-win10-languagepack }
